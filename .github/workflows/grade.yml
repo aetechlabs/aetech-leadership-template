@@ -16,18 +16,26 @@ jobs:
       - name: Run Leadership Check
         id: test
         run: |
-          if [ ! -f "proposal.md" ]; then
+          SCORE=0
+          if [ -f "proposal.md" ]; then
+            SCORE=$((SCORE + 50))
+            WORDS=$(wc -w < proposal.md)
+            if [ $WORDS -ge 150 ]; then
+              SCORE=$((SCORE + 50))
+              echo "Proposal meets requirements! (+50%)"
+            else
+              echo "proposal.md is too short ($WORDS words). (+0%)"
+            fi
+          else
             echo "proposal.md not found!"
-            exit 1
           fi
           
-          WORDS=$(wc -w < proposal.md)
-          if [ $WORDS -lt 150 ]; then
-            echo "proposal.md is too short ($WORDS words). Must be at least 150 words."
+          echo "Final Score: $SCORE%"
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+          
+          if [ $SCORE -lt 55 ]; then
             exit 1
           fi
-          
-          echo "Proposal meets requirements!"
           exit 0
         continue-on-error: true
 
@@ -45,6 +53,7 @@ jobs:
                  \"repository\": \"${{ github.repository }}\",
                  \"username\": \"${{ github.actor }}\",
                  \"status\": \"$OUTCOME\",
+                 \"score\": ${{ steps.test.outputs.score }},
                  \"commit\": \"${{ github.sha }}\"
                }" \
                $WEBHOOK_URL
