@@ -1,0 +1,50 @@
+name: Auto-Grading
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Run Leadership Check
+        id: test
+        run: |
+          if [ ! -f "proposal.md" ]; then
+            echo "proposal.md not found!"
+            exit 1
+          fi
+          
+          WORDS=$(wc -w < proposal.md)
+          if [ $WORDS -lt 150 ]; then
+            echo "proposal.md is too short ($WORDS words). Must be at least 150 words."
+            exit 1
+          fi
+          
+          echo "Proposal meets requirements!"
+          exit 0
+        continue-on-error: true
+
+      - name: Report Status to Academy Backend
+        env:
+          WEBHOOK_URL: "https://backend.aetechlabs.com/api/academy/webhooks/github"
+        run: |
+          OUTCOME="fail"
+          if [ "${{ steps.test.outcome }}" == "success" ]; then
+            OUTCOME="pass"
+          fi
+
+          curl -X POST -H "Content-Type: application/json" \
+               -d "{
+                 \"repository\": \"${{ github.repository }}\",
+                 \"username\": \"${{ github.actor }}\",
+                 \"status\": \"$OUTCOME\",
+                 \"commit\": \"${{ github.sha }}\"
+               }" \
+               $WEBHOOK_URL
